@@ -1,0 +1,23 @@
+# ===== 安全敏感：绝对不要提交 =====
+# 如果你以后把 API Key 存到 .env 文件里，这行会保护它
+.env
+# 防止脚本里误写入硬编码 Key（以防万一）
+*key*.py
+*secret*.py
+
+# ===== Python 缓存（浪费空间，不需要备份） =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# ===== VS Code 本地配置（仅对你自己的电脑生效） =====
+.vscode/
+*.code-workspace
+
+# ===== 系统临时文件 =====
+.DS_Store
+Thumbs.db
+*.log
