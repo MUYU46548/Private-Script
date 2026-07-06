@@ -42,13 +42,14 @@ def ensure_output_dir():
         os.makedirs(OUTPUT_DIR)
         print(f"📁 创建目录: {OUTPUT_DIR}")
 
-def download_image(url, prompt="image"):
+def download_image(url, prompt="image", index=1):
     """下载图片到本地"""
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # 用提示词前20个字符作为文件名的一部分
         safe_prompt = "".join(c if c.isalnum() or c in "_-" else "_" for c in prompt[:20])
-        filepath = os.path.join(OUTPUT_DIR, f"{timestamp}.png")
+        # 添加序号，防止同一秒内下载的多张图片互相覆盖
+        filepath = os.path.join(OUTPUT_DIR, f"{timestamp}_{index:02d}.png")
 
         print(f"⬇️  正在下载: {url[:80]}...")
         resp = requests.get(url, timeout=60)
@@ -195,27 +196,20 @@ def wait_for_task(task_id, max_wait=180, poll_interval=3):
 def generate_image(prompt, size="1024*1024", n=1, negative_prompt=None):
     """
     完整的文生图流程：提交 -> 等待 -> 下载
-
-    Args:
-        prompt: 正向提示词
-        size: 图片尺寸
-        n: 生成数量
-        negative_prompt: 负向提示词
     """
     ensure_output_dir()
 
-    # 1. 提交任务
     task_id = submit_task(prompt, size, n, negative_prompt)
     if not task_id:
         return None
 
-    # 2. 等待任务完成
     result = wait_for_task(task_id)
     if not result:
         return None
 
-    # 3. 提取图片URL并下载
     results = result.get("output", {}).get("results", [])
+    print(f"📦 实际生成图片数: {len(results)} / 请求数: {n}")
+
     if not results:
         print("❌ 未找到生成的图片")
         return None
@@ -223,29 +217,32 @@ def generate_image(prompt, size="1024*1024", n=1, negative_prompt=None):
     downloaded = []
     for i, item in enumerate(results):
         url = item.get("url")
-        if url:
-            print(f"\n🖼️  第 {i+1} 张图片:")
-            filepath = download_image(url, prompt)
-            if filepath:
-                downloaded.append(filepath)
+        if not url:
+            print(f"⚠️  第 {i+1} 张图片缺少 URL，跳过")
+            continue
 
-    print(f"\n🎉 完成！共生成 {len(downloaded)} 张图片")
+        print(f"\n🖼️  第 {i+1} 张图片:")
+        # 关键：传递 index=i+1
+        filepath = download_image(url, prompt, index=i+1)
+        if filepath:
+            downloaded.append(filepath)
+        else:
+            print(f"⚠️  第 {i+1} 张图片下载失败")
+
+    print(f"\n🎉 成功下载 {len(downloaded)} 张图片")
     return downloaded
-
 
 # ================== 运行示例 ==================
 
 if __name__ == "__main__":
     # ===== OC 人物设定示例 =====
-    prompt = """一位黑发少女的动漫角色设定图，短发及耳，清爽直发，棕黄色眼眸，眼神锐利而沉稳。
-    身穿天蓝色哥特式立领连衣裙，裙摆缀有白色蕾丝和细窄荷叶边，腰部系一条丝带。
-    双手自然垂于身侧，站立姿态，微微侧身。
-    背景为浅蓝至白色的渐变天空，地上是草地，点缀几缕柔和云彩。
-    画面采用正面平视构图，清晰外轮廓线，明暗分界明显，高光简洁，色彩饱和明亮。整体氛围冷静、优雅、神秘。
-    全身像，2D动漫，平涂风格"""
+    prompt = """一位黑发少女的动漫角色设定图，平涂风格，短发及耳，清爽直发，发梢泛起淡蓝色微光，棕黄色眼眸映着星光，眼神沉静而疏离。
+    身穿明制汉服，宽袖长袄，象牙白面料，领缘和袖口绣有暗银色云纹，领口用细带系结。下配一条深红色的织金马面裙，裙面平整宽大，裙门处绣有精致的五角星和缠枝花纹。
+    她穿着黑色皮鞋，站在古镇长桥上，背景是青山与黑瓦白墙。
+    风吹起披帛和发梢，画面呈广角全景，色彩以紫、蓝、粉白为主，氛围唯美飘渺，自带仙气。"""
 
     # 负向提示词：排除不想要的元素
-    negative_prompt = "低质量，模糊，变形，糟糕的构图，水印，文字，扭曲的肢体，扭曲的手，耳环，旗袍，尖耳，精灵耳，过曝，偏色，杂线，粗糙阴影"
+    negative_prompt = "低质量，模糊，变形，糟糕的构图，水印，文字，扭曲的肢体，扭曲的手，耳环，旗袍，民国装，修身旗袍，高开叉，立领，盘扣，侧开衩，过曝，偏色，杂线，粗糙阴影，写实风，3D感，肌肉过度，面容僵硬，多余人像"
 
     # 调用生成
     generate_image(
