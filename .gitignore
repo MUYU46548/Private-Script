@@ -21,3 +21,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.log
+
+# 忽略所有临时输出
+oc_extraction_output/
