@@ -7,10 +7,9 @@ Obsidian OC作品双向链接校验脚本（增强版）
 功能：检查含有 "## 官作出场记录" 章节的角色文档，
       验证其作品链接在目标作品的 "## 登场角色" 中是否有正确的反向链接。
       所有详细结果输出为 Markdown 报告文件。
-      支持指定多个角色文件夹。
-限制：目前仅需检查”新作角色“中的”主要角色“，故角色文档路径只放一个文件夹。
-      若模板发生调整或页面结构变动，可能影响本脚本工作准确性。
-用法：修改下方 VAULT_PATH、ROLE_FOLDER、REPORT_PATH 后直接运行。
+      支持指定多个角色文件夹和多个作品文件夹。
+限制：若模板发生调整或页面结构变动，可能影响本脚本工作准确性。
+用法：修改下方用户配置后直接运行。
 """
 
 import re
@@ -19,7 +18,8 @@ from datetime import datetime
 
 # ============== 用户配置 ==============
 VAULT_PATH = "E:/图书馆/ROSA"          # 修改为你的 Obsidian 仓库根目录
-ROLE_FOLDERS =  ["03 设定/01 人物/02 新作人物", "03 设定/01 人物/01 旧作人物"] # 存放角色文档的文件夹名（相对 VAULT_PATH）
+ROLE_FOLDERS =  ["03 设定/01 人物/02 新作人物", "03 设定/01 人物/01 旧作人物"]  # 存放角色文档的文件夹名（相对 VAULT_PATH）
+WORK_FOLDERS = ["04 官方作品/01 旧作专区", "04 官方作品/02 书籍"]  # 作品文档所在的多个文件夹（相对 VAULT_PATH）
 REPORT_PATH = "E:/图书馆/ROSA/96 事务管理/OC校验报告.md"           # 报告输出路径
 # ======================================
 
@@ -37,7 +37,23 @@ def extract_section(text, section_title):
     return match.group(1).strip() if match else ""
 
 
-def check_single_role(vault_path, role_file_path, report):
+def find_work_file(vault_path, work_name, work_folders):
+    """
+    在指定的作品文件夹列表中查找 work_name.md
+    返回：Path 对象（如果找到），否则 None
+    """
+    for folder in work_folders:
+        candidate = Path(vault_path) / folder / f"{work_name}.md"
+        if candidate.exists():
+            return candidate
+    # 如果没找到，再尝试根目录（兼容旧习惯）
+    root_candidate = Path(vault_path) / f"{work_name}.md"
+    if root_candidate.exists():
+        return root_candidate
+    return None
+
+
+def check_single_role(vault_path, role_file_path, work_folders, report):
     """
     检查单个角色，所有输出追加到 report 列表
     返回：是否有错误（True/False）
@@ -69,15 +85,18 @@ def check_single_role(vault_path, role_file_path, report):
     has_error = False
 
     for work in work_links:
-        work_file = Path(vault_path) / f"{work}.md"
-        if not work_file.exists():
-            report.append(f"    - ⚠️ 作品文档不存在: `{work}.md`")
+        # 使用新函数查找作品文件
+        work_file = find_work_file(vault_path, work, work_folders)
+        if work_file is None:
+            report.append(f"    - ⚠️ 作品文档不存在: `{work}.md`（在指定作品文件夹中未找到）")
             has_error = True
             continue
 
+        # 读取作品文档
         with open(work_file, 'r', encoding='utf-8') as f:
             work_content = f.read()
 
+        # 检查 "## 登场角色" 区域的反向链接
         section_text = extract_section(work_content, "登场角色")
         if not section_text:
             report.append(f"    - ⚠️ 作品 `{work}` 无 `## 登场角色` 章节，跳过反向检查")
@@ -90,36 +109,41 @@ def check_single_role(vault_path, role_file_path, report):
         else:
             report.append(f"    - ✅ 作品 `{work}` 的反向链接正确")
 
-    report.append("")  # 空行分隔
+    report.append("")
     return has_error
 
 
-def generate_report(vault_path, role_folders, report_path):
-    """遍历所有角色文件夹（自动去重），生成报告"""
-    # 收集所有角色文档的路径（相对路径）
+def generate_report(vault_path, role_folders, work_folders, report_path):
+    """遍历所有角色文件夹，生成报告"""
+    # 收集所有角色文档
     all_role_files = set()
     for folder in role_folders:
         role_dir = Path(vault_path) / folder
         if not role_dir.exists():
-            print(f"⚠️ 跳过不存在的文件夹: {folder}")
+            print(f"⚠️ 跳过不存在的角色文件夹: {folder}")
             continue
         for file in role_dir.glob("*.md"):
             rel_path = str(file.relative_to(vault_path))
             all_role_files.add(rel_path)
 
     if not all_role_files:
-        print("❌ 未在任何指定文件夹中找到角色文档")
+        print("❌ 未在任何指定角色文件夹中找到角色文档")
         return
 
-    role_files = sorted(all_role_files)  # 排序保持一致性
+    role_files = sorted(all_role_files)
     print(f"📂 共找到 {len(role_files)} 个角色文档（来自文件夹：{', '.join(role_folders)}）")
+    if work_folders:
+        print(f"📂 作品文档将在以下文件夹中查找：{', '.join(work_folders)}")
+    else:
+        print("📂 作品文档仅在根目录中查找")
 
-    # 初始化报告内容
+    # 初始化报告
     report_lines = [
         f"# Obsidian 链接校验报告",
         f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"仓库路径：`{vault_path}`",
         f"角色文件夹：{', '.join(f'`{f}`' for f in role_folders)}",
+        f"作品文件夹：{', '.join(f'`{f}`' for f in work_folders) if work_folders else '根目录'}",
         "",
         f"共检查 **{len(role_files)}** 个角色文档。",
         "---",
@@ -128,18 +152,16 @@ def generate_report(vault_path, role_folders, report_path):
 
     error_count = 0
     for rel_path in role_files:
-        # 输出将更加简洁，如需完整进度信息可将下一行取消注释使其可用
-        # print(f"正在检查: {Path(rel_path).stem}")
-        if check_single_role(vault_path, rel_path, report_lines):
+        if check_single_role(vault_path, rel_path, work_folders, report_lines):
             error_count += 1
 
-    # 添加总结
+    # 总结
     report_lines.append("---")
     report_lines.append(f"## 总结")
     report_lines.append(f"- 检查角色总数：{len(role_files)}")
     report_lines.append(f"- 发现问题（含缺失反向链接、文档不存在等）的角色数：{error_count}")
 
-    # 写入文件（自动创建父目录）
+    # 写入报告
     report_path = Path(report_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, 'w', encoding='utf-8') as f:
@@ -149,4 +171,4 @@ def generate_report(vault_path, role_folders, report_path):
 
 
 if __name__ == "__main__":
-    generate_report(VAULT_PATH, ROLE_FOLDERS, REPORT_PATH)
+    generate_report(VAULT_PATH, ROLE_FOLDERS, WORK_FOLDERS, REPORT_PATH)
