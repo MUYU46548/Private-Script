@@ -17,7 +17,7 @@ your_script = r"E:\CODE\CangKu\Python_Workspace\Image\text_to_image.py"
 # 获取脚本所在目录，作为工作目录
 script_dir = os.path.dirname(your_script)
 
-for i in range(2):  # 循环轮数，如填入10代表执行10轮，最终产出张数=循环轮数*生图脚本单批生成数
+for i in range(3):  # 循环轮数，如填入10代表执行10轮，最终产出张数=循环轮数*生图脚本单批生成数
     print(f"\n{'='*50}")
     print(f"🔄 第 {i+1} 轮开始")
     print(f"⏰ 时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
