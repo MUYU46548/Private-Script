@@ -54,14 +54,14 @@ def create_task(prompt: str):
     headers = {**HEADERS_COMMON, "X-DashScope-Async": "enable"}
     
     payload = {
-        "model": "wan2.6-image",
+        "model": "qwen-image-max-2025-12-30",  # 模型名称
         "input": {
             "messages": [
                 {"role": "user", "content": [{"text": prompt}]}
             ]
         },
         "parameters": {
-            "size": "1280*720",  # 尺寸，受限于模型
+            "size": "1664*928",  # 尺寸，受限于模型
             "n": 1,  # 张数，受限于模型。部分模型为批量处理，该值为批次数
             "enable_interleave": True
         }
@@ -133,7 +133,7 @@ def generate_images(prompt: str, num_images: int = 4):
 
 if __name__ == "__main__":
     try:
-        prompt = "一位紫色长直发少女，温柔的文学气质，穿水手服与格纹裙，站在湖边。动漫二次元，2D，平涂，柔和色彩。"
+        prompt = "黑色长发少女，全身像，红瞳，可爱的表情，身穿蓝紫色连衣裙，白色圆领，领口有红色蝴蝶结装饰，头戴金色月亮发饰，背景是简洁的自然风景，光线柔和，整体氛围神秘优雅。动漫二次元，2D，平涂，柔和色彩。"
         urls = generate_images(prompt, num_images=3)
         
         print("\n📂 已保存的图片:")
