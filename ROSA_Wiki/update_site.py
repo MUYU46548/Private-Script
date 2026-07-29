@@ -52,7 +52,8 @@ def run_command(cmd, cwd=None, verbose=False):
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1
     )
     output_lines = []
@@ -123,28 +124,67 @@ def start_preview_server(public_dir, port, open_browser=True):
         return True
 
 def git_push(project_root, branch):
-    """提交 public 目录到 Git"""
-    print(f"\n📤 开始 Git 推送（分支 {branch}）...")
+    """通过 worktree 将 public/ 同步到 deploy 孤儿分支并推送"""
+    print(f"\n📤 开始 Git 推送（分支 deploy）...")
 
     git_dir = os.path.join(project_root, ".git")
     if not os.path.exists(git_dir):
         print("⚠️  当前目录不是 Git 仓库，跳过推送")
         return False
 
-    # 用 Python 生成时间戳，彻底兼容 Windows / Linux / macOS
+    # deploy worktree 路径
+    worktree_base = os.path.join(os.path.dirname(project_root), ".quartz-deploy")
+    if not os.path.exists(worktree_base):
+        ret, output = run_command("git worktree list", cwd=project_root)
+        if ret == 0:
+            for line in output.splitlines():
+                if "deploy" in line:
+                    parts = line.split()
+                    if len(parts) >= 1:
+                        worktree_base = parts[0]
+                        break
+
+    if not os.path.exists(worktree_base):
+        print(f"⚠️  找不到 deploy worktree 目录: {worktree_base}")
+        print("   尝试创建 worktree...")
+        ret, output = run_command(
+            f"git worktree add --detach {worktree_base} deploy",
+            cwd=project_root
+        )
+        if ret != 0:
+            print(f"❌ 创建 worktree 失败: {output}")
+            return False
+        print(f"✅ 已创建 worktree: {worktree_base}")
+
+    public_dir = os.path.join(project_root, "public")
+    if not os.path.exists(public_dir):
+        print(f"❌ 错误: public 目录不存在: {public_dir}")
+        return False
+
+    print(f"📂 同步 public/ → {worktree_base}")
+
+    if sys.platform == "win32":
+        cmd = f'xcopy /E /I /Y /Q "{public_dir}\\*" "{worktree_base}\\"'
+    else:
+        cmd = f'rsync -a --delete "{public_dir}/" "{worktree_base}/"'
+
+    ret, output = run_command(cmd, cwd=project_root)
+    if ret != 0 and ret != 2:
+        print(f"❌ 同步文件失败: {output}")
+        return False
+
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     commit_msg = f"自动构建更新 [{timestamp}]"
 
     commands = [
-        "git add public",           # 只添加 public 目录
+        "git add -A",
         f'git commit -m "{commit_msg}"',
-        f"git push origin {branch}"
+        "git push --force origin deploy"
     ]
 
     for cmd in commands:
-        ret, output = run_command(cmd, cwd=project_root)
+        ret, output = run_command(cmd, cwd=worktree_base)
         if ret != 0:
-            # 如果是因为没有变更而失败，不算错误
             if "nothing to commit" in output or "no changes" in output:
                 print("ℹ️ 没有内容变更，跳过提交")
                 return True

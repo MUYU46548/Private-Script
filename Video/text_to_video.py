@@ -10,7 +10,7 @@ import time
 
 # ==================== 配置区域 ====================
 # 1. 设置API地址（请将 {WorkspaceId} 替换为你的真实业务空间ID）
-#    北京地域专属域名，建议使用[reference:2]
+#    北京地域专属域名，建议使用
 dashscope.base_http_api_url = 'https://ws-jpfxicqpptynsgny.cn-beijing.maas.aliyuncs.com/api/v1'
 
 # 2. 设置API Key（推荐从环境变量读取，更安全）
