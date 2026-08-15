@@ -37,7 +37,7 @@ DASHSCOPE_BASE_HTTP_API_URL = 'https://ws-jpfxicqpptynsgny.cn-beijing.maas.aliyu
 #   - "wanx2.1-kf2v-plus"   : 首尾帧生视频（需提供首帧和尾帧）
 #   - "wanx-img2video-pro"  : 专业图生视频
 #   - 其他万相模型名称（如 wan2.7 系列，待 SDK 更新后可直接使用）
-MODEL = "wanx2.1-i2v-turbo"
+MODEL = "wan2.7-i2v-2026-04-25"
 
 # 轮询配置
 POLL_INTERVAL = 5          # 轮询间隔（秒）
